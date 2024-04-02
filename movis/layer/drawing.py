@@ -410,12 +410,14 @@ class Text(AttributesMixin):
         color: tuple[int, int, int] | str | None = None,
         contents: Sequence[FillProperty | StrokeProperty] = (),
         line_spacing: int | None = None,
+        letter_spacing: int | None = None,
         text_alignment: TextAlignment | str = TextAlignment.CENTER,
         duration: float = 1e6
     ) -> None:
         self._text = text
         self._font_family = font_family
         self._font_style = font_style
+        self._letter_spacing = letter_spacing
         self.font_size = Attribute(font_size, value_type=AttributeType.SCALAR, range=(0., 1e6))
         if color is None:
             self._contents = tuple(contents)
@@ -427,6 +429,9 @@ class Text(AttributesMixin):
         self._duration = duration
         if QCoreApplication.instance() is None:
             QApplication(sys.argv[:1])
+
+        
+        
         self._init_app = True
 
     def __getstate__(self) -> dict[str, Any]:
@@ -455,6 +460,10 @@ class Text(AttributesMixin):
         return self._line_spacing
 
     @property
+    def letter_spacing(self) -> int | None:
+        return self._letter_spacing
+
+    @property
     def text_alignment(self) -> TextAlignment:
         return self._text_alignment
 
@@ -472,11 +481,18 @@ class Text(AttributesMixin):
             raise ValueError(f"Invalid text type: {type(self.text)}")
 
     def _get_qfont(self, time: float) -> QFont:
-        if self.font_style is None:
-            return QFont(self.font_family, round(float(self.font_size(time))))
-        else:
-            return QFontDatabase.font(
-                self.font_family, self.font_style, round(float(self.font_size(time))))
+        
+        id = QFontDatabase.addApplicationFont(f'/opt/Fonts/all/{self.font_family}.ttf')
+        if id < 0: print("Error")
+        families = QFontDatabase.applicationFontFamilies(id)
+        qfont = QFont(families[0], round(float(self.font_size(time))))
+        qfont.setCapitalization(QFont.Capitalization.AllUppercase)
+        if self.letter_spacing:
+            qfont.setLetterSpacing(QFont.AbsoluteSpacing, self.letter_spacing)
+        qfont.setBold(True)
+        qfont.setStyleStrategy(QFont.StyleStrategy.PreferOutline)
+        
+        return qfont
 
     def get_size(self, time: float = 0.) -> tuple[int, int]:
         """Returns the size of the text at the given time.
@@ -595,7 +611,7 @@ class Text(AttributesMixin):
 def _clip_image(image: np.ndarray) -> np.ndarray:
     assert image.ndim == 3
     assert image.shape[2] == 4
-    non_empty_pixels = (image[:, :, 3] != 0)
+    non_empty_pixels = np.all(image != np.array([0, 0, 0, 0]), axis=-1)
     non_empty_row_indices, non_empty_col_indices = np.where(non_empty_pixels)
     if non_empty_row_indices.size == 0 or non_empty_col_indices.size == 0:
         return image

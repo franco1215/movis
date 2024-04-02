@@ -224,6 +224,9 @@ def to_rgb(color: str | tuple[int, int, int] | Sequence[int]) -> tuple[int, int,
     Returns:
         A tuple of three integers ``(R, G, B)`` that represent the RGB values.
     """
+    if color and 'transparent' == color:
+        return _hex_to_rgb("white")
+
     if isinstance(color, SequenceType) and all(isinstance(x, int) for x in color):
         return (int(color[0]), int(color[1]), int(color[2]))
     elif isinstance(color, str):
